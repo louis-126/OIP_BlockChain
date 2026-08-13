@@ -17,7 +17,6 @@
 | --- | --- |
 | `LJDvoting.sol` | Solidity voting contract |
 | `LJDvoting.json` | Compiled contract artifact used for deployment |
-| `compile.js` | Compiles the Solidity source into the deployment artifact |
 | `deploy.js` | Deploys the contract and supplies its constructor topics |
 | `call.js` | Opens the interactive contract menu |
 | `.env.example` | Example Hedera Testnet configuration |
@@ -79,16 +78,6 @@ When `OWNER_ID` and `OWNER_KEY` are configured:
 - `call.js` checks the configured owner against the owner recorded on-chain before submitting either transaction.
 
 This contract has no ownership-transfer function. If the private key for an existing contract's deployer is unavailable, deploy a new contract with the desired owner and update `CONTRACT_ID`.
-
-## Compiling the contract
-
-Compile the Solidity source using the pinned compiler version:
-
-```powershell
-npm run compile
-```
-
-This regenerates `LJDvoting.json` with the contract ABI and bytecode.
 
 ## Deploying the contract
 
