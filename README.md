@@ -1,6 +1,6 @@
-# xhampterr — Hedera Testnet Voting Contract
+# LJDvoting — Hedera Testnet Voting Contract
 
-`xhampterr` is a Solidity voting application deployed to the Hedera Testnet. Voting topics are set when the contract is deployed, each account may vote once, results can be queried from an interactive Node.js menu, and only the account that deployed the contract can manage the blacklist.
+`LJDvoting` is a Solidity voting application deployed to the Hedera Testnet. Voting topics are set when the contract is deployed, each account may vote once, results can be queried from an interactive Node.js menu, and only the account that deployed the contract can manage the blacklist.
 
 ## Features
 
@@ -15,8 +15,9 @@
 
 | File | Purpose |
 | --- | --- |
-| `xhampterr.sol` | Solidity voting contract |
-| `xhampterr.json` | Compiled contract artifact used for deployment |
+| `LJDvoting.sol` | Solidity voting contract |
+| `LJDvoting.json` | Compiled contract artifact used for deployment |
+| `compile.js` | Compiles the Solidity source into the deployment artifact |
 | `deploy.js` | Deploys the contract and supplies its constructor topics |
 | `call.js` | Opens the interactive contract menu |
 | `.env.example` | Example Hedera Testnet configuration |
@@ -79,18 +80,28 @@ When `OWNER_ID` and `OWNER_KEY` are configured:
 
 This contract has no ownership-transfer function. If the private key for an existing contract's deployer is unavailable, deploy a new contract with the desired owner and update `CONTRACT_ID`.
 
+## Compiling the contract
+
+Compile the Solidity source using the pinned compiler version:
+
+```powershell
+npm run compile
+```
+
+This regenerates `LJDvoting.json` with the contract ABI and bytecode.
+
 ## Deploying the contract
 
 Deploy the included artifact and provide at least two voting topics:
 
 ```powershell
-node deploy.js .\xhampterr.json --topics "Topic A" "Topic B" "Topic C"
+node deploy.js .\LJDvoting.json --topics "Topic A" "Topic B" "Topic C"
 ```
 
 Topic strings must be no longer than 32 characters. An optional gas limit can also be supplied:
 
 ```powershell
-node deploy.js .\xhampterr.json --topics "Yes" "No" --gas 5000000
+node deploy.js .\LJDvoting.json --topics "Yes" "No" --gas 5000000
 ```
 
 After a successful deployment, the script prints the contract ID, EVM address, and HashScan link. Copy the new contract ID into `.env`:

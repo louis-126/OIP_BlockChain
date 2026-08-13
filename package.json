@@ -1,16 +1,20 @@
 {
-  "name": "xhampterr",
+  "name": "ljdvoting",
   "version": "1.0.0",
-  "description": "OTH Summer School voting contract — deploy & interact via Hedera Testnet",
+  "description": "LJDvoting smart contract — deploy and interact via Hedera Testnet",
   "main": "deploy.js",
   "scripts": {
+    "compile": "node compile.js",
     "deploy": "node deploy.js",
     "call": "node call.js",
-    "help": "echo 'Run: node deploy.js <artifact.json> --topics \"TopicA\" \"TopicB\"'"
+    "help": "echo 'Run: node deploy.js LJDvoting.json --topics \"TopicA\" \"TopicB\"'"
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.40.0",
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "solc": "0.8.34"
   },
   "engines": {
     "node": ">=18"

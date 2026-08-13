@@ -1,5 +1,5 @@
 /**
- * call.js — xhampterr contract interaction script (interactive menu edition)
+ * call.js — LJDvoting contract interaction script (interactive menu edition)
  *
  * Matches the hendrikebbers/oth-summer-school repo pattern:
  *   - "query"   mode  → ContractCallQuery           (free, view/pure functions)
@@ -364,7 +364,7 @@ const MENU = [
 
 function printMenu(contractId) {
     console.log("\n──────────────────────────────────────────");
-    console.log(` xhampterr — Hedera Testnet contract menu`);
+    console.log(` LJDvoting — Hedera Testnet contract menu`);
     console.log(` Contract: ${contractId}`);
     console.log("──────────────────────────────────────────");
     MENU.forEach((item, i) => {

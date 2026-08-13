@@ -1,5 +1,5 @@
 /**
- * deploy.js — xhampterr contract deployer
+ * deploy.js — LJDvoting contract deployer
  *
  * Matches the hendrikebbers/oth-summer-school repo pattern:
  * uses ContractCreateFlow which handles bytecode chunking and
@@ -8,13 +8,13 @@
  * Usage
  * ─────
  *   # From a Remix-exported artifact JSON:
- *   node deploy.js ./artifacts/xhampterr.json
+ *   node deploy.js ./LJDvoting.json
  *
  *   # With constructor topics (bytes32 array):
- *   node deploy.js ./artifacts/xhampterr.json --topics "TopicA" "TopicB" "TopicC"
+ *   node deploy.js ./LJDvoting.json --topics "TopicA" "TopicB" "TopicC"
  *
  *   # Custom gas limit:
- *   node deploy.js ./artifacts/xhampterr.json --topics "Yes" "No" --gas 400000
+ *   node deploy.js ./LJDvoting.json --topics "Yes" "No" --gas 400000
  *
  * Prerequisites
  * ─────────────

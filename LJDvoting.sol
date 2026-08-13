@@ -2,7 +2,7 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 /**
- * @title  xhampterr
+ * @title  LJDvoting
  * @notice OTH Summer School — voting contract.
  *
  * Test requirements
@@ -16,7 +16,7 @@ pragma solidity >=0.7.0 <0.9.0;
  * Based on the lecture patterns (Poll V1 + V2) and the
  * hendrikebbers/oth-summer-school repository baseline.
  */
-contract xhampterr {
+contract LJDvoting {
 
     // ─────────────────────────────────────────────
     //  Data structures  (matches lecture slides)
@@ -65,7 +65,7 @@ contract xhampterr {
     // ─────────────────────────────────────────────
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "xhampterr: caller is not admin");
+        require(msg.sender == admin, "LJDvoting: caller is not admin");
         _;
     }
 
@@ -109,15 +109,15 @@ contract xhampterr {
     function vote(uint proposal) public {
         require(
             !blacklist[msg.sender],
-            "xhampterr: your address is not permitted to vote"
+            "LJDvoting: your address is not permitted to vote"
         );
         require(
             voters[msg.sender] == VoterState.NotVoted,
-            "xhampterr: you have already voted"
+            "LJDvoting: you have already voted"
         );
         require(
             proposal < proposals.length,
-            "xhampterr: invalid proposal index"
+            "LJDvoting: invalid proposal index"
         );
 
         voters[msg.sender] = VoterState.Voted;
@@ -182,8 +182,8 @@ contract xhampterr {
      *         future calls to vote() will be rejected.
      */
     function addToBlacklist(address account) public onlyAdmin {
-        require(account != address(0), "xhampterr: zero address");
-        require(!blacklist[account],   "xhampterr: already blacklisted");
+        require(account != address(0), "LJDvoting: zero address");
+        require(!blacklist[account],   "LJDvoting: already blacklisted");
         blacklist[account] = true;
         emit AddedToBlacklist(account);
     }
@@ -194,7 +194,7 @@ contract xhampterr {
      *         VoterState.Voted is permanent — they still cannot vote again.
      */
     function removeFromBlacklist(address account) public onlyAdmin {
-        require(blacklist[account], "xhampterr: not blacklisted");
+        require(blacklist[account], "LJDvoting: not blacklisted");
         blacklist[account] = false;
         emit RemovedFromBlacklist(account);
     }
@@ -232,7 +232,7 @@ contract xhampterr {
         pure
         returns (bytes32 result)
     {
-        require(bytes(text).length <= 32, "xhampterr: string exceeds 32 chars");
+        require(bytes(text).length <= 32, "LJDvoting: string exceeds 32 chars");
         // solhint-disable-next-line no-inline-assembly
         assembly {
             result := mload(add(text, 32))
