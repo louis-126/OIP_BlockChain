@@ -356,17 +356,6 @@ const MENU = [
             console.log(`  Status            : ${receipt.status}`);
         },
     },
-    {
-        key: "stringToBytes32",
-        label: "Helper: encode a string to bytes32",
-        async run(rl, client, contractId) {
-            const text = await rl.question("  Text to encode (max 32 chars): ");
-            const params = new ContractFunctionParameters().addString(text);
-            const res = await runQuery(client, contractId, "stringToBytes32", params, CONFIG.GAS);
-            const hex = "0x" + Buffer.from(res.getBytes32(0)).toString("hex");
-            console.log(`\nResult\n  bytes32 of "${text}" : ${hex}`);
-        },
-    },
 ];
 
 // ─────────────────────────────────────────────
