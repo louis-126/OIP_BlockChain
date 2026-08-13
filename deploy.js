@@ -116,15 +116,35 @@ async function main() {
     const bytecodeHex = loadBytecode(artifactPath);
     console.log(`\nBytecode loaded  (${bytecodeHex.length / 2} bytes)`);
 
-    // 3. Connect to Hedera Testnet  (from .env)
-    const operatorId  = AccountId.fromString(process.env.OPERATOR_ID);
-    const operatorKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+    // 3. Connect to Hedera Testnet. The deployer becomes the contract owner,
+    // so prefer dedicated OWNER credentials when they are configured.
+    const hasOwnerId = Boolean(process.env.OWNER_ID?.trim());
+    const hasOwnerKey = Boolean(process.env.OWNER_KEY?.trim());
+    if (hasOwnerId !== hasOwnerKey) {
+        throw new Error("Set both OWNER_ID and OWNER_KEY in .env, or omit both.");
+    }
+
+    const deployerIdValue = hasOwnerId
+        ? process.env.OWNER_ID.trim()
+        : process.env.OPERATOR_ID?.trim();
+    const deployerKeyValue = hasOwnerKey
+        ? process.env.OWNER_KEY.trim()
+        : process.env.OPERATOR_KEY?.trim();
+    if (!deployerIdValue || !deployerKeyValue) {
+        throw new Error(
+            "OWNER_ID and OWNER_KEY (or fallback OPERATOR_ID and OPERATOR_KEY) " +
+            "must be set in .env.",
+        );
+    }
+
+    const operatorId = AccountId.fromString(deployerIdValue);
+    const operatorKey = PrivateKey.fromStringECDSA(deployerKeyValue);
 
     const client = Client.forTestnet();
     client.setOperator(operatorId, operatorKey);
     client.setDefaultMaxTransactionFee(new Hbar(100));
     client.setMaxQueryPayment(new Hbar(50));
-    console.log(`Connected to Hedera Testnet as ${operatorId}`);
+    console.log(`Connected to Hedera Testnet as owner/deployer ${operatorId}`);
 
     // 4. Build constructor parameters — bytes32[] for topic names
     let constructorParams = null;

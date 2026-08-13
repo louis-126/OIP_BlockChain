@@ -129,6 +129,44 @@ async function runExecute(client, contractId, methodName, params, gas) {
     return txResponse.getReceipt(client);
 }
 
+async function getBlacklistStatus(client, contractId, evmAddress) {
+    const params = new ContractFunctionParameters().addAddress(evmAddress);
+    const res = await runQuery(client, contractId, "isBlacklisted", params, CONFIG.GAS);
+    return res.getBool(0);
+}
+
+async function verifyContractOwner(ownerClient, contractId, ownerId) {
+    const [ownerIdentity, ownerResult] = await Promise.all([
+        resolveAccountIdentity(ownerClient, ownerId.toString()),
+        // The Solidity contract calls its deployer/owner "admin".
+        runQuery(ownerClient, contractId, "admin", null, CONFIG.GAS),
+    ]);
+    const contractOwnerAddress = normalizeEvmAddress(ownerResult.getAddress(0));
+
+    if (ownerIdentity.evmAddress !== contractOwnerAddress) {
+        let contractOwnerLabel = contractOwnerAddress;
+        try {
+            const contractOwnerIdentity = await resolveAccountIdentity(
+                ownerClient,
+                contractOwnerAddress,
+            );
+            contractOwnerLabel =
+                `${contractOwnerIdentity.accountId} (${contractOwnerIdentity.evmAddress})`;
+        } catch {
+            // The EVM address alone is still enough to diagnose the mismatch.
+        }
+
+        throw new Error(
+            `Configured owner signer ${ownerIdentity.accountId} did not deploy this contract. ` +
+            `Its EVM address is ${ownerIdentity.evmAddress}, but the contract owner is ` +
+            `${contractOwnerLabel}. Use that account's OWNER_ID and OWNER_KEY, or redeploy ` +
+            `the contract with your configured owner account.`,
+        );
+    }
+
+    return ownerIdentity;
+}
+
 // ─────────────────────────────────────────────
 //  Menu definition
 // ─────────────────────────────────────────────
@@ -215,34 +253,107 @@ const MENU = [
                 "  Hedera account ID (0.0.x) or EVM address (0x...): ",
             );
             const identity = await resolveAccountIdentity(client, account);
-            const params = new ContractFunctionParameters().addAddress(identity.evmAddress);
-            const res = await runQuery(client, contractId, "isBlacklisted", params, CONFIG.GAS);
+            const isBlacklisted = await getBlacklistStatus(
+                client,
+                contractId,
+                identity.evmAddress,
+            );
             console.log(`\nResult`);
             console.log(`  Hedera account ID : ${identity.accountId}`);
             console.log(`  EVM address       : ${identity.evmAddress}`);
-            console.log(`  Is blacklisted    : ${res.getBool(0)}`);
+            console.log(`  Is blacklisted    : ${isBlacklisted}`);
         },
     },
     {
         key: "addToBlacklist",
-        label: "(admin) Add an address to the blacklist",
-        async run(rl, client, contractId) {
-            const address = await rl.question("  Address to blacklist (0x...): ");
-            const params = new ContractFunctionParameters().addAddress(address);
-            const receipt = await runExecute(client, contractId, "addToBlacklist", params, CONFIG.GAS);
-            console.log(`\nResult\n  ${address} added to blacklist`);
-            console.log(`  Status : ${receipt.status}`);
+        label: "(owner) Add an address to the blacklist",
+        async run(rl, client, contractId, context) {
+            const account = await rl.question(
+                "  Hedera account ID (0.0.x) or EVM address (0x...) to blacklist: ",
+            );
+            const [identity, ownerIdentity] = await Promise.all([
+                resolveAccountIdentity(client, account),
+                verifyContractOwner(context.ownerClient, contractId, context.ownerId),
+            ]);
+            const alreadyBlacklisted = await getBlacklistStatus(
+                client,
+                contractId,
+                identity.evmAddress,
+            );
+
+            if (alreadyBlacklisted) {
+                console.log(`\nNo change made: this account is already blacklisted.`);
+                console.log(`  Hedera account ID : ${identity.accountId}`);
+                console.log(`  EVM address       : ${identity.evmAddress}`);
+                console.log(`  Is blacklisted    : true`);
+                return;
+            }
+
+            const params = new ContractFunctionParameters().addAddress(identity.evmAddress);
+            const receipt = await runExecute(
+                context.ownerClient,
+                contractId,
+                "addToBlacklist",
+                params,
+                CONFIG.GAS,
+            );
+            const isBlacklisted = await getBlacklistStatus(
+                client,
+                contractId,
+                identity.evmAddress,
+            );
+            console.log(`\nResult`);
+            console.log(`  Hedera account ID : ${identity.accountId}`);
+            console.log(`  EVM address       : ${identity.evmAddress}`);
+            console.log(`  Is blacklisted    : ${isBlacklisted}`);
+            console.log(`  Executed by owner : ${ownerIdentity.accountId}`);
+            console.log(`  Status            : ${receipt.status}`);
         },
     },
     {
         key: "removeFromBlacklist",
-        label: "(admin) Remove an address from the blacklist",
-        async run(rl, client, contractId) {
-            const address = await rl.question("  Address to remove (0x...): ");
-            const params = new ContractFunctionParameters().addAddress(address);
-            const receipt = await runExecute(client, contractId, "removeFromBlacklist", params, CONFIG.GAS);
-            console.log(`\nResult\n  ${address} removed from blacklist`);
-            console.log(`  Status : ${receipt.status}`);
+        label: "(owner) Remove an address from the blacklist",
+        async run(rl, client, contractId, context) {
+            const account = await rl.question(
+                "  Hedera account ID (0.0.x) or EVM address (0x...) to remove: ",
+            );
+            const [identity, ownerIdentity] = await Promise.all([
+                resolveAccountIdentity(client, account),
+                verifyContractOwner(context.ownerClient, contractId, context.ownerId),
+            ]);
+            const alreadyBlacklisted = await getBlacklistStatus(
+                client,
+                contractId,
+                identity.evmAddress,
+            );
+
+            if (!alreadyBlacklisted) {
+                console.log(`\nNo change made: this account is not blacklisted.`);
+                console.log(`  Hedera account ID : ${identity.accountId}`);
+                console.log(`  EVM address       : ${identity.evmAddress}`);
+                console.log(`  Is blacklisted    : false`);
+                return;
+            }
+
+            const params = new ContractFunctionParameters().addAddress(identity.evmAddress);
+            const receipt = await runExecute(
+                context.ownerClient,
+                contractId,
+                "removeFromBlacklist",
+                params,
+                CONFIG.GAS,
+            );
+            const isBlacklisted = await getBlacklistStatus(
+                client,
+                contractId,
+                identity.evmAddress,
+            );
+            console.log(`\nResult`);
+            console.log(`  Hedera account ID : ${identity.accountId}`);
+            console.log(`  EVM address       : ${identity.evmAddress}`);
+            console.log(`  Is blacklisted    : ${isBlacklisted}`);
+            console.log(`  Executed by owner : ${ownerIdentity.accountId}`);
+            console.log(`  Status            : ${receipt.status}`);
         },
     },
     {
@@ -276,17 +387,41 @@ function printMenu(contractId) {
 
 async function main() {
     // Connect to Hedera Testnet
-    const operatorId = AccountId.fromString(process.env.OPERATOR_ID);
-    const operatorKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+    const operatorIdValue = process.env.OPERATOR_ID?.trim();
+    const operatorKeyValue = process.env.OPERATOR_KEY?.trim();
+    if (!operatorIdValue || !operatorKeyValue) {
+        throw new Error("OPERATOR_ID and OPERATOR_KEY must both be set in .env.");
+    }
+
+    const hasOwnerId = Boolean(process.env.OWNER_ID?.trim());
+    const hasOwnerKey = Boolean(process.env.OWNER_KEY?.trim());
+    if (hasOwnerId !== hasOwnerKey) {
+        throw new Error(
+            "Set both OWNER_ID and OWNER_KEY in .env, or omit both to use the operator " +
+            "as the contract owner.",
+        );
+    }
+
+    const operatorId = AccountId.fromString(operatorIdValue);
+    const operatorKey = PrivateKey.fromStringECDSA(operatorKeyValue);
+    const ownerId = AccountId.fromString(
+        hasOwnerId ? process.env.OWNER_ID.trim() : operatorIdValue,
+    );
+    const ownerKey = PrivateKey.fromStringECDSA(
+        hasOwnerKey ? process.env.OWNER_KEY.trim() : operatorKeyValue,
+    );
 
     const client = Client.forTestnet();
     client.setOperator(operatorId, operatorKey);
+    const ownerClient = Client.forTestnet();
+    ownerClient.setOperator(ownerId, ownerKey);
 
     const contractId = ContractId.fromString(CONFIG.CONTRACT_ID);
 
     const rl = readline.createInterface({ input, output });
 
-    console.log(`\nOperator  : ${operatorId}`);
+    console.log(`\nOperator     : ${operatorId}`);
+    console.log(`Owner signer : ${ownerId}${hasOwnerId ? "" : " (operator fallback)"}`);
 
     try {
         while (true) {
@@ -308,7 +443,7 @@ async function main() {
             }
 
             try {
-                await item.run(rl, client, contractId);
+                await item.run(rl, client, contractId, { ownerClient, ownerId });
             } catch (err) {
                 console.error("\n❌ Action failed:", err.message ?? err);
             }
@@ -316,6 +451,7 @@ async function main() {
     } finally {
         rl.close();
         client.close();
+        ownerClient.close();
     }
 }
 
@@ -326,4 +462,9 @@ if (require.main === module) {
     });
 }
 
-module.exports = { normalizeEvmAddress, resolveAccountIdentity, resolveEvmAddress };
+module.exports = {
+    normalizeEvmAddress,
+    resolveAccountIdentity,
+    resolveEvmAddress,
+    verifyContractOwner,
+};
