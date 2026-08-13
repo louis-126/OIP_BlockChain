@@ -30,6 +30,7 @@ const {
     ContractId,
     PrivateKey,
     AccountId,
+    AccountInfoQuery,
 } = require("@hashgraph/sdk");
 
 require("dotenv").config();
@@ -50,6 +51,63 @@ const CONFIG = {
 /** Decode a bytes32 return value to a readable string. */
 function bytes32ToString(buf) {
     return Buffer.from(buf).toString("utf8").replace(/\0/g, "");
+}
+
+/** Validate an EVM/Solidity address and return it with a 0x prefix. */
+function normalizeEvmAddress(value) {
+    const match = value.trim().match(/^(?:0x)?([0-9a-fA-F]{40})$/);
+    if (!match) {
+        throw new Error(
+            "Enter a Hedera account ID (for example 0.0.1234) " +
+            "or a 20-byte EVM address (0x followed by 40 hex characters).",
+        );
+    }
+
+    return `0x${match[1].toLowerCase()}`;
+}
+
+/**
+ * Resolve either a Hedera account ID or an EVM address to the address Solidity
+ * sees as msg.sender. AccountInfoQuery is important for ECDSA accounts because
+ * their EVM alias is not necessarily the long-zero form of 0.0.x.
+ */
+async function resolveAccountIdentity(client, value) {
+    const inputAddress = value.trim();
+    if (!inputAddress) {
+        throw new Error("An account ID or EVM address is required.");
+    }
+
+    let accountLookup;
+    if (inputAddress.includes(".")) {
+        try {
+            accountLookup = AccountId.fromString(inputAddress);
+        } catch {
+            throw new Error(
+                `Invalid Hedera account ID "${inputAddress}". Expected a value like 0.0.1234.`,
+            );
+        }
+    } else {
+        const evmAddress = normalizeEvmAddress(inputAddress);
+        accountLookup = AccountId.fromEvmAddress(0, 0, evmAddress);
+    }
+
+    const accountInfo = await new AccountInfoQuery()
+        .setAccountId(accountLookup)
+        .execute(client);
+
+    if (!accountInfo.contractAccountId) {
+        throw new Error(`No EVM address was found for Hedera account ${accountInfo.accountId}.`);
+    }
+
+    return {
+        accountId: accountInfo.accountId.toString(),
+        evmAddress: normalizeEvmAddress(accountInfo.contractAccountId),
+    };
+}
+
+async function resolveEvmAddress(client, value) {
+    const identity = await resolveAccountIdentity(client, value);
+    return identity.evmAddress;
 }
 
 async function runQuery(client, contractId, methodName, params, gas) {
@@ -137,20 +195,32 @@ const MENU = [
         key: "hasVoted",
         label: "Check if an address has voted",
         async run(rl, client, contractId) {
-            const address = await rl.question("  Address to check (0x...): ");
-            const params = new ContractFunctionParameters().addAddress(address);
+            const account = await rl.question(
+                "  Hedera account ID (0.0.x) or EVM address (0x...): ",
+            );
+            const identity = await resolveAccountIdentity(client, account);
+            const params = new ContractFunctionParameters().addAddress(identity.evmAddress);
             const res = await runQuery(client, contractId, "hasVoted", params, CONFIG.GAS);
-            console.log(`\nResult\n  Has voted : ${res.getBool(0)}`);
+            console.log(`\nResult`);
+            console.log(`  Hedera account ID : ${identity.accountId}`);
+            console.log(`  EVM address       : ${identity.evmAddress}`);
+            console.log(`  Has voted         : ${res.getBool(0)}`);
         },
     },
     {
         key: "isBlacklisted",
         label: "Check if an address is blacklisted",
         async run(rl, client, contractId) {
-            const address = await rl.question("  Address to check (0x...): ");
-            const params = new ContractFunctionParameters().addAddress(address);
+            const account = await rl.question(
+                "  Hedera account ID (0.0.x) or EVM address (0x...): ",
+            );
+            const identity = await resolveAccountIdentity(client, account);
+            const params = new ContractFunctionParameters().addAddress(identity.evmAddress);
             const res = await runQuery(client, contractId, "isBlacklisted", params, CONFIG.GAS);
-            console.log(`\nResult\n  Is blacklisted : ${res.getBool(0)}`);
+            console.log(`\nResult`);
+            console.log(`  Hedera account ID : ${identity.accountId}`);
+            console.log(`  EVM address       : ${identity.evmAddress}`);
+            console.log(`  Is blacklisted    : ${res.getBool(0)}`);
         },
     },
     {
@@ -245,10 +315,15 @@ async function main() {
         }
     } finally {
         rl.close();
+        client.close();
     }
 }
 
-main().catch((err) => {
-    console.error("\n❌ Fatal error:", err.message ?? err);
-    process.exit(1);
-});
+if (require.main === module) {
+    main().catch((err) => {
+        console.error("\n❌ Fatal error:", err.message ?? err);
+        process.exit(1);
+    });
+}
+
+module.exports = { normalizeEvmAddress, resolveAccountIdentity, resolveEvmAddress };
